@@ -12,6 +12,7 @@
 #include <string.h>
 
 #define SERVERPORT "12345"
+#define BUFFERSIZE 512
 
 int main(int argc, char const *argv[])
 {
@@ -25,9 +26,9 @@ int main(int argc, char const *argv[])
     inet_pton(AF_INET, "127.0.0.1", &raddr.sin_addr);
 
     // 设置socket选项
-    int sendbuf = 50;   //发送缓冲区大小设置为 50 bytes，默认为 256 bytes
+    int sendbuf = atoi(argv[1]);   //命令行设置发送缓冲区大小，默认为 2048 bytes
     int sendlen = sizeof(sendbuf);
-    setsockopt(lfd, SOL_SOCKET, SO_SNDBUF, &sendbuf, sendlen);
+    setsockopt(lfd, SOL_SOCKET, SO_SNDBUF, &sendbuf, sizeof(sendbuf));
 
     // 读取socket选项
     getsockopt(lfd, SOL_SOCKET, SO_SNDBUF, &sendbuf, (socklen_t *)& sendlen);
@@ -35,10 +36,10 @@ int main(int argc, char const *argv[])
 
     connect(lfd, (struct sockaddr *)&raddr, sizeof(raddr));
     
-    char send_msg[BUFSIZ];
-    memset(send_msg, 'a', BUFSIZ);
-    int n = send(lfd, send_msg, BUFSIZ, 0);
-    printf("initial bufsize is %d, real send msg size is %d\n", BUFSIZ, n);
+    char send_msg[BUFFERSIZE];
+    memset(send_msg, 'a', BUFFERSIZE);
+    int n = send(lfd, send_msg, BUFFERSIZE, 0);
+    printf("initial bufsize is %d, real send msg size is %d\n", BUFFERSIZE, n);
     
     close(lfd);
 
