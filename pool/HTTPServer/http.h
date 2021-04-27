@@ -25,6 +25,7 @@
 #include <sys/mman.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <sys/uio.h>
 
 #include "locker.h"
 
@@ -89,26 +90,26 @@ public:
     //处理客户请求
     void process();
     //非阻塞读
-    bool nonblocking_read();
+    bool Read();
     //非阻塞写
-    bool nonblocking_write();
+    bool Write();
 
 private:
     //初始化连接，私有方法
     void init();
 
     //解析HTTP请求
-    HTTP_CODE process_request();
+    HTTP_CODE process_read();
     //下面这一组函数被process_request调用以分析HTTP请求
+    LINE_STATUS parse_line();
     HTTP_CODE parse_request_line(char *text);
     HTTP_CODE parse_headers(char *text);
     HTTP_CODE parse_content(char *text);
     HTTP_CODE do_request();
     char *get_line() { return m_read_buf + m_start_line; }
-    LINE_STATUS parse_line();
 
     //生成HTTP响应
-    bool process_response(HTTP_CODE res);
+    bool process_write(HTTP_CODE res);
     //下面这一组函数被process_response调用以生成HTTP响应
     void unmap();
     bool add_response(const char *format, ...);
