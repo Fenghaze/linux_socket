@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>  
+#include <fcntl.h>
 #include "threadpool.h"
 #include "http.h"
 
@@ -20,7 +20,7 @@
 #define MAX_EVENT_NUMBER 10000
 
 //声明外部函数
-extern void addfd(int epfd, int fd);
+extern void addfd(int epfd, int fd, bool one_shot);
 extern void removefd(int epfd, int fd);
 
 void addsig(int sig, void(handler)(int), bool restart = true)
@@ -32,6 +32,7 @@ void addsig(int sig, void(handler)(int), bool restart = true)
   {
     sa.sa_flags |= SA_RESTART;
   }
+  sigfillset(&sa.sa_mask);
   assert(sigaction(sig, &sa, NULL) != -1);
 }
 
@@ -49,7 +50,7 @@ int main(int argc, char const *argv[])
   struct sockaddr_in laddr;
   int ret;
 
-  //创建线程池
+  //创建用于HTTP服务的线程池
   threadpool<HTTPConn> *pool = nullptr;
   try
   {
@@ -76,8 +77,8 @@ int main(int argc, char const *argv[])
   laddr.sin_port = htons(atoi(SERVERPORT));
   inet_pton(AF_INET, "0.0.0.0", &laddr.sin_addr);
 
-  int val = 1;
-  setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+  struct linger tmp = {1, 0};
+  setsockopt(lfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
 
   ret = bind(lfd, (struct sockaddr *)&laddr, sizeof(laddr));
   assert(ret >= 0);
@@ -89,7 +90,7 @@ int main(int argc, char const *argv[])
   assert(epfd != -1);
   epoll_event events[MAX_EVENT_NUMBER];
   //监听lfd
-  addfd(epfd, lfd);
+  addfd(epfd, lfd, false);
 
   //初始化HTTP服务类的m_epollfd
   HTTPConn::m_epollfd = epfd;
@@ -114,6 +115,11 @@ int main(int argc, char const *argv[])
         if (cfd < 0)
         {
           fprintf(stdout, "errno is :%d\n", errno);
+          continue;
+        }
+        if (HTTPConn::m_user_count >= MAX_FD)
+        {
+          show_error(cfd, "Internal server busy");
           continue;
         }
         //初始化客户连接
