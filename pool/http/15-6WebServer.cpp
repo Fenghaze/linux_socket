@@ -73,6 +73,7 @@ int main(int argc, char const *argv[])
 
   //socket配置
   lfd = socket(AF_INET, SOCK_STREAM, 0);
+  assert(lfd >= 0);
   laddr.sin_family = AF_INET;
   laddr.sin_port = htons(atoi(SERVERPORT));
   inet_pton(AF_INET, "0.0.0.0", &laddr.sin_addr);
@@ -81,6 +82,7 @@ int main(int argc, char const *argv[])
   setsockopt(lfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
 
   ret = bind(lfd, (struct sockaddr *)&laddr, sizeof(laddr));
+  printf("lfd = %d\n", lfd);
   assert(ret >= 0);
   ret = listen(lfd, 5);
   assert(ret >= 0);
@@ -137,7 +139,7 @@ int main(int argc, char const *argv[])
         /*根据读的结果，决定是将任务添加到线程池，还是关闭连接*/
         if (users[sockfd].Read())
         {
-          pool->append(users + sockfd);
+          pool->append(users + sockfd); //数组首地址+cfd编号
         }
         else
         {
