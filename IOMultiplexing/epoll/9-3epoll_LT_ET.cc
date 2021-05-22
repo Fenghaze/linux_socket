@@ -172,7 +172,8 @@ int main(int argc, char const *argv[])
 
     listen(lfd, 5);
     //向epfd上添加监听套接字
-    addfd(lfd, true);
+    bool is_et = true;
+    addfd(lfd, is_et);
     while (1)
     {
         //epoll监听等待
@@ -182,10 +183,14 @@ int main(int argc, char const *argv[])
             perror("epoll_wait()");
             exit(1);
         }
+        if(is_et)
+        {
+            //ET触发模式    
+            et(events, ret, lfd);
+        }
         //LT触发模式
-        lt(events, ret, lfd);
-        //ET触发模式    
-        //et(events, ret, lfd);
+        else lt(events, ret, lfd);
+        
     }
     close(lfd);
     return 0;
