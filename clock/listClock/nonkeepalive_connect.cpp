@@ -27,7 +27,7 @@
 #define BUFFERSIZE 10
 #define MAXEVENTNUM 1024
 #define FD_LIMIT 65535
-#define TIMESLOT 5
+#define TIMESLOT 3
 
 static int epfd;
 static int pipefd[2];
@@ -63,9 +63,10 @@ void clock_func(ClientData *user)
 //信号处理函数：使用管道pipefd[1]发送错误码给管道pipefd[0]
 void sig_handler(int sig)
 {
+    printf("sigalrm = %d\n", sig);
     int save_errno = errno;
     int msg = sig;
-    send(pipefd[1], (char *)msg, 1, 0);
+    int len = send(pipefd[1], (char *)&msg, 1, 0);
     errno = save_errno;
 }
 
@@ -78,6 +79,11 @@ void addsig(int sig)
     sa.sa_flags |= SA_RESTART;
     sigfillset(&sa.sa_mask);
     assert(sigaction(sig, &sa, NULL) != -1);
+    // if(signal(sig, sig_handler)==SIG_ERR)
+    // {
+    //     perror("signal");
+    //     return ;
+    // }
 }
 
 void time_handler()
@@ -100,18 +106,21 @@ int main(int argc, char const *argv[])
     laddr.sin_port = htons(atoi(SERVERPORT));
     inet_pton(AF_INET, "127.0.0.1", &laddr.sin_addr);
 
+    int val = 1;
+    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
     bind(lfd, (struct sockaddr *)&laddr, sizeof(laddr));
 
     listen(lfd, 5);
 
     //epoll
-    epfd = epoll_create(3);
+    epfd = epoll_create(1);
     epoll_event events[MAXEVENTNUM];
 
     addfd(epfd, lfd);
 
     //创建双向管道
-    socketpair(AF_INET, SOCK_STREAM, 0, pipefd);
+    socketpair(PF_UNIX, SOCK_STREAM, 0, pipefd);
     setnonblocking(pipefd[1]); //设置为非阻塞
     addfd(epfd, pipefd[0]);    //监听读事件
 
@@ -122,8 +131,7 @@ int main(int argc, char const *argv[])
     ClientData *users = new ClientData[FD_LIMIT];
 
     bool timeout = false;
-    alarm(TIMESLOT); //TIMESLOT秒后触发一次SIGALRM信号
-
+    alarm(TIMESLOT); //TIMESLOT秒后触发一次SIGALRM信号,pipefd[0]可读
     bool stop_server = false;
     while (!stop_server)
     {
@@ -133,15 +141,19 @@ int main(int argc, char const *argv[])
             printf("epoll faliure\n");
             break;
         }
-        for (size_t i = 0; i < n; i++)
+        for (int i = 0; i < n; i++)
         {
             int fd = events[i].data.fd;
             //有新客户连接：接受连接；添加一个定时器
             if (fd == lfd)
             {
                 struct sockaddr_in client_address;
+                char ip[INET_ADDRSTRLEN];
                 socklen_t client_addrlength = sizeof(client_address);
                 int cfd = accept(lfd, (struct sockaddr *)&client_address, &client_addrlength);
+                inet_ntop(AF_INET, &client_address.sin_addr, ip, INET_ADDRSTRLEN);
+                printf("client %s:%d\n", ip, ntohs(client_address.sin_port));
+                
                 addfd(epfd, cfd);
 
                 //初始化用户信息结构体
@@ -153,8 +165,9 @@ int main(int argc, char const *argv[])
                 timer->callback = clock_func;
                 timer->client_data = &users[cfd];
                 time_t cur = time(nullptr);
-                timer->expire = cur + 3 * TIMESLOT;
+                timer->expire = cur + 3 * TIMESLOT; //定时器运行时间
 
+                users[cfd].timer = timer;
                 //添加到定时器容器中
                 list_clock.addClock(timer);
             }
@@ -174,9 +187,9 @@ int main(int argc, char const *argv[])
                 }
                 else
                 {
-                    for (size_t i = 0; i < ret; i++)
+                    for (int i = 0; i < ret; i++)
                     {
-                        switch (i)
+                        switch (signals[i])
                         {
                         case SIGALRM: //定时信号触发
                         {
@@ -203,7 +216,7 @@ int main(int argc, char const *argv[])
                 while (1)
                 {
                     memset(users[fd].buf, '\0', BUFFERSIZE);
-                    int ret = read(fd, users[i].buf, BUFFERSIZE - 1);
+                    int ret = read(fd, users[fd].buf, BUFFERSIZE - 1);
                     if (ret < 0)
                     {
                         /*对于非阻塞IO，下面的条件成立表示数据已经全部读取完毕。

@@ -1,7 +1,8 @@
 /**
  * @author: fenghaze
  * @date: 2021/05/22 14:13
- * @desc: 
+ * @desc: 使用SO_SNDTIMEO选项设置连接超时定时事件
+ * 如果connect返回的errno==EINPROGRESS，则处理定时事件
  */
 
 #include <stdlib.h>

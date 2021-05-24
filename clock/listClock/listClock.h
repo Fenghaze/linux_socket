@@ -39,7 +39,7 @@ public:
     UtilTimer *next; //指向后一个定时器
 };
 
-//升序的双向链表定时器容器：初始化链表、销毁链表、插入节点、修改节点、删除节点
+//升序的双向链表定时器容器：初始化链表、销毁链表、插入节点、修改节点、删除节点、执行定时任务
 class ListClock
 {
 public:
@@ -160,6 +160,7 @@ public:
     {
         if (!head)
         {
+            printf("timer is null\n");
             return;
         }
         printf("timer tick\n");

@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
-#define SERVERPORT "12345"
+#define SERVERPORT "7788"
 
 int main(int argc, char const *argv[])
 {
